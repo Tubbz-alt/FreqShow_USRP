@@ -1,4 +1,4 @@
-FreqShow
+FreqShow - USRP Version
 ========
 
-Raspberry Pi &amp; PiTFT-based RTL-SDR frequency scanning and display tool.  See installation and usage instructions in the guide at: https://learn.adafruit.com/freq-show-raspberry-pi-rtl-sdr-scanner/overview
+Modifications to original FreqShow code from Adafruit that used a Raspberry Pi &amp; PiTFT-based RTL-USB SDR to run the frequency scanning and display tool using a Ettus Research USRP B200 mini SDR.
