@@ -5,7 +5,10 @@
 <p>Modifications to original FreqShow code from Adafruit that used a Raspberry Pi &amp; PiTFT-based RTL-USB SDR to run the frequency scanning and display tool using a Ettus Research USRP B200 mini SDR.</p>
 
 ## Description:
-<p>.... </p>
+<p>.... 
+
+Uses the USRP Python API: https://kb.ettus.com/UHD_Python_API
+</p>
 
 <p>To run, type on the Raspberry Pi terminal:</p>
 
