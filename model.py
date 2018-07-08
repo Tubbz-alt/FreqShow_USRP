@@ -21,9 +21,15 @@
 # AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# SOFTWARE
+
 import numpy as np
-from rtlsdr import *
+#from rtlsdr import 
+
+# Include UHD specific libraries
+import uhd
+import numpy as np
+import argparse
 
 import freqshow
 
@@ -41,11 +47,11 @@ class FreqShowModel(object):
 		self.max_auto_scale = True
 		self.set_min_intensity('AUTO')
 		self.set_max_intensity('AUTO')
-		# Initialize RTL-SDR library.
-		self.sdr = RtlSdr()
+		# Initialize USRP library
+		self.sdr = uhd.usrp.MultiUSRP(args.args)
 		self.set_center_freq(90.3)
-		self.set_sample_rate(2.4)
-		self.set_gain('AUTO')
+		self.set_sample_rate(1e6)
+		self.set_gain(10)
 
 	def _clear_intensity(self):
 		if self.min_auto_scale:
