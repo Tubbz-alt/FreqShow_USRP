@@ -33,6 +33,19 @@ import argparse
 
 import freqshow
 
+def parse_args():
+    """Parse the command line arguments"""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-a", "--args", default="", type=str)
+    parser.add_argument("-f", "--freq", type=float, required=True)
+    parser.add_argument("-r", "--rate", default=1e6, type=float)
+    parser.add_argument("-g", "--gain", type=int, default=10)
+    parser.add_argument("-d", "--duration", default=5.0, type=float)
+    parser.add_argument("-c", "--channels", default=0, nargs="+", type=int)
+    parser.add_argument("-n", "--nsamps", type=int, default=100000)
+    parser.add_argument("--dyn", type=int, default=60)
+    parser.add_argument("--ref", type=int, default=0)
+return parser.parse_args()
 
 class FreqShowModel(object):
 	def __init__(self, width, height):
@@ -47,11 +60,7 @@ class FreqShowModel(object):
 		self.max_auto_scale = True
 		self.set_min_intensity('AUTO')
 		self.set_max_intensity('AUTO')
-		# Initialize USRP library
-		self.sdr = uhd.usrp.MultiUSRP(args.args)
-		self.set_center_freq(90.3)
-		self.set_sample_rate(1e6)
-		self.set_gain(10)
+
 
 	def _clear_intensity(self):
 		if self.min_auto_scale:
@@ -159,28 +168,77 @@ class FreqShowModel(object):
 		values which are the intensities of each frequency bucket (i.e. FFT of
 		radio samples).
 		"""
+		args = parse_args()
+		usrp = uhd.usrp.MultiUSRP(args.args)
+
+		# Set the USRP rate, freq, and gain
+    		usrp.set_rx_rate(args.rate, args.channel)
+    		usrp.set_rx_freq(uhd.types.TuneRequest(args.freq), args.channel)
+		usrp.set_rx_gain(args.gain, args.channel)
+
+		# Create the buffer to recv samples
+		num_samps = max(args.nsamps, width) 
+		# num_samps = int(np.ceil(args.duration*args.rate)) - for set number of samples instead of streaming?
+    		samples = np.empty((1, num_samps), dtype=np.complex64)
+
+    		st_args = uhd.usrp.StreamArgs("fc32", "sc16")
+    		st_args.channels = [args.channel]
+
+		# samps = usrp.recv_num_samps(num_samps, args.freq, args.rate, args.channels, args.gain) - for set number of samples instead of streaming?
+		
+    		metadata = uhd.types.RXMetadata()
+    		streamer = usrp.get_rx_stream(st_args)
+    		buffer_samps = streamer.get_max_num_samps()
+    		recv_buffer = np.zeros((1, buffer_samps), dtype=np.complex64)
+
+    		stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.start_cont)
+    		stream_cmd.stream_now = True
+    		streamer.issue_stream_cmd(stream_cmd)
+
+    		db_step = float(args.dyn) / (height - 1.0)
+    		db_start = db_step * int((args.ref - args.dyn) / db_step)
+		db_stop = db_step * int(args.ref / db_step)
+
+		
+            	# Receive the samples
+            	recv_samps = 0
+            	while recv_samps < num_samps:
+                	samps = streamer.recv(recv_buffer, metadata)
+
+                	if metadata.error_code != uhd.types.RXMetadataErrorCode.none:
+                    		print(metadata.strerror())
+                	if samps:
+                    		real_samps = min(num_samps - recv_samps, samps)
+                    		samples[:, recv_samps:recv_samps + real_samps] = recv_buffer[:, 0:real_samps]
+				recv_samps += real_samps
+
+		stream_cmd = uhd.types.StreamCMD(uhd.types.StreamMode.stop_cont)
+		streamer.issue_stream_cmd(stream_cmd)
+		
+		# Original code below - TODO: Hook into original code with UHD stream to recieve from USRP
+		#
 		# Get width number of raw samples so the number of frequency bins is
 		# the same as the display width.  Add two because there will be mean/DC
 		# values in the results which are ignored.
-		samples = self.sdr.read_samples(freqshow.SDR_SAMPLE_SIZE)[0:self.width+2]
+		## samples = self.sdr.read_samples(freqshow.SDR_SAMPLE_SIZE)[0:self.width+2]
 		# Run an FFT and take the absolute value to get frequency magnitudes.
-		freqs = np.absolute(np.fft.fft(samples))
+		## freqs = np.absolute(np.fft.fft(samples))
 		# Ignore the mean/DC values at the ends.
-		freqs = freqs[1:-1]
+		## freqs = freqs[1:-1]
 		# Shift FFT result positions to put center frequency in center.
-		freqs = np.fft.fftshift(freqs)
+		## freqs = np.fft.fftshift(freqs)
 		# Convert to decibels.
-		freqs = 20.0*np.log10(freqs)
+		## freqs = 20.0*np.log10(freqs)
 		# Update model's min and max intensities when auto scaling each value.
-		if self.min_auto_scale:
-			min_intensity = np.min(freqs)
-			self.min_intensity = min_intensity if self.min_intensity is None \
-				else min(min_intensity, self.min_intensity)
-		if self.max_auto_scale:
-			max_intensity = np.max(freqs)
-			self.max_intensity = max_intensity if self.max_intensity is None \
-				else max(max_intensity, self.max_intensity)
+		## if self.min_auto_scale:
+		## 	min_intensity = np.min(freqs)
+		##	self.min_intensity = min_intensity if self.min_intensity is None \
+		##		else min(min_intensity, self.min_intensity)
+		## if self.max_auto_scale:
+		##	max_intensity = np.max(freqs)
+		##	self.max_intensity = max_intensity if self.max_intensity is None \
+		##		else max(max_intensity, self.max_intensity)
 		# Update intensity range (length between min and max intensity).
-		self.range = self.max_intensity - self.min_intensity
+		## self.range = self.max_intensity - self.min_intensity
 		# Return frequency intensities.
-		return freqs
+		## return freqs
